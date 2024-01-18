@@ -4,9 +4,10 @@ import path from 'path';
 import fs from 'fs';
 const directoryName = 'emailsTemplate'; // 你可以替换成你想要的目录路径
 const fileName = 'index.html';
+const baseUrl = 'http://localhost:3000';
 export default function handler(req, res) {
   // 定义要下载的页面URL
-  const url = 'http://localhost:3000/charts';
+  const url = baseUrl + '/charts';
   const rootPath = path.parse(process.cwd()).root;
   // 使用axios下载页面内容
   axios
@@ -14,23 +15,17 @@ export default function handler(req, res) {
     .then((response) => {
       // 使用cheerio解析HTML
       const $ = cheerio.load(response.data);
-      return $;
-    })
-    .then(($) => {
       const html = $.html();
       // 创建目录
-      fs.mkdir(path.join(rootPath, directoryName), { recursive: true }, (err) => {
+      fs.mkdirSync(path.join(rootPath, directoryName), { recursive: true }, (err) => {
         if (err) {
-          res.status(500).json({ msg: 'fail' });
+          throw new Error(`${directoryName} directory can't be created: ${err.message}`);
         } else {
           // 创建index.html文件
           const filePath = path.join(rootPath, directoryName, fileName);
-          fs.writeFile(filePath, html, (err) => {
+          fs.writeFileSync(filePath, html, (err) => {
             if (err) {
-              res.status(500).json({ msg: 'fail' });
-              console.error(`Error creating ${fileName}: ${err.message}`);
-            } else {
-              console.log('success create file');
+              throw new Error(`Error creating ${fileName}: ${err.message}`);
             }
           });
         }
@@ -42,7 +37,6 @@ export default function handler(req, res) {
       const jsFiles = [];
       $('script[src]').each((index, element) => {
         const jsFile = $(element).attr('src');
-        console.log(jsFile);
         jsFiles.push(jsFile);
       });
       console.log('jsFiles', jsFiles);
@@ -50,21 +44,28 @@ export default function handler(req, res) {
       // 下载JS文件
       jsFiles.forEach((jsFile, i) => {
         axios
-          .get('http://localhost:3000' + jsFile)
+          .get(baseUrl + jsFile)
           .then((jsResponse) => {
+            let jsFileName = '';
             // 保存JS文件到本地
-            const fileName = i;
-            const filePath = path.join(rootPath, directoryName, fileName + '.js');
+            // 匹配斜杠后面的 js 文件名，直到字符串结尾或者问号为止
+            const regex = /\/([^\/]+\.js)(?:\?|$)/;
+            const match = jsFile.match(regex);
+            if (match && match[1]) {
+              jsFileName = match[1];
+            }
+            const filePath = path.join(rootPath, directoryName, jsFileName);
             fs.writeFileSync(filePath, jsResponse.data);
             console.log(`Downloaded ${fileName}`);
           })
           .catch((error) => {
-            console.error(`Error downloading ${jsFile}: ${error.message}`);
+            throw new Error(`Error downloading ${jsFile}: ${error.message}`);
           });
       });
       res.status(200).json({ msg: 'success' });
     })
     .catch((error) => {
       console.error(`Error fetching ${url}: ${error.message}`);
+      res.status(500).json({ msg: 'fail' });
     });
 }
