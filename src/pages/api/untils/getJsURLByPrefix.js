@@ -3,19 +3,20 @@
  * */
 import { DOUBLE_SLASH_REG, URL_REG } from '@/src/pages/api/constants';
 
-const jsDownloadAddress = (baseUrl, sourceURL) => {
+const jsDownloadAddress = (curUrl, sourceURL) => {
   // 如果是完整的url，直接返回
-  if (URL_REG.test(baseUrl)) {
-    return baseUrl;
+  if (URL_REG.test(curUrl)) {
+    return curUrl;
   }
   // 如果是以双斜杠开头的url，加上https:
-  if (DOUBLE_SLASH_REG.test(baseUrl)) {
-    return `https:${baseUrl}`;
+  if (DOUBLE_SLASH_REG.test(curUrl)) {
+    return `https:${curUrl}`;
   }
   // 如果是以单斜杠开头的url，加上源地址
-  if (baseUrl.startsWith('/')) {
-    return sourceURL + baseUrl;
+  if (curUrl.startsWith('/')) {
+    return sourceURL + curUrl;
   }
-  return baseUrl;
+  // 如果开头没有斜杠，直接加上源地址
+  return sourceURL + '/' + curUrl;
 };
 export default jsDownloadAddress;
