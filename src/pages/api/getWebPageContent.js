@@ -65,7 +65,7 @@ export default async function getWebPageContent(req, res) {
           const jsUrl = jsDownloadAddress(headScript.codeSrc, baseUrl);
           const jsCode = await fetchJsFile(jsUrl);
           headJsCodeSource.push({
-            code: jsCode,
+            code: `${jsCode}`,
             index: headScript.index,
           });
         }
@@ -74,24 +74,39 @@ export default async function getWebPageContent(req, res) {
           const jsUrl = jsDownloadAddress(bodyScript.codeSrc, baseUrl);
           const jsCode = await fetchJsFile(jsUrl);
           bodyJsCodeSource.push({
-            code: jsCode,
+            code: `${jsCode}`,
             index: bodyScript.index,
           });
         }
+
+        // 遍历body中的script元素，按照jsCodeSource中的顺序替换script元素的内容
+        $bodyScripts.each((index, element) => {
+          if (bodyJsCodeSource[index]) {
+            // 移除当前script元素的src属性,并将jsCodeSource中的js代码替换到当前script元素中
+            $(element).removeAttr('src').text(bodyJsCodeSource[index].code);
+          }
+        });
 
         // 遍历head中的script元素，按照jsCodeSource中的顺序替换script元素的内容
         $headScripts.each((index, element) => {
           if (headJsCodeSource[index]) {
             // 移除当前script元素的src属性，并将jsCodeSource中的js代码替换到当前script元素中
-            $(element).removeAttr('src').html(headJsCodeSource[index].code);
+            // 如果代码中存在</script>，则会导致代码被截断，所以需要将</script>替换为<\/script>
+            if (headJsCodeSource[index].code.includes('</script>')) {
+              headJsCodeSource[index].code = headJsCodeSource[index].code.replace(
+                /<\/script>/g,
+                '&lt;' + '/script' + '&gt;',
+              );
+            }
+            // $(element).removeAttr('src').text(headJsCodeSource[index].code);
+            $(element).remove();
+            // 创建script元素
+            const scriptElement = `<script>${headJsCodeSource[index].code}</script>`;
+            // 将script元素插入到body元素中
+            $('body').append(scriptElement);
           }
         });
-        $bodyScripts.each((index, element) => {
-          if (bodyJsCodeSource[index]) {
-            // 移除当前script元素的src属性,并将jsCodeSource中的js代码替换到当前script元素中
-            $(element).removeAttr('src').html(bodyJsCodeSource[index].code);
-          }
-        });
+
         resHTML($.html());
       })
       .catch((error) => {
